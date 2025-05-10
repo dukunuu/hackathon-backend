@@ -9,6 +9,7 @@ import (
 	"github.com/dukunuu/hackathon_backend/file"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -30,6 +31,16 @@ func Init(addr, jwtSecret string, database *db.Queries, filestore file.FileStore
 func (s *Server) Start() {
 	r := chi.NewRouter()
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // Allow all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any major browsers
+	})
+
+	r.Use(c.Handler)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger) // Chi's built-in logger
