@@ -141,6 +141,28 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, e
 	return i, err
 }
 
+const createPostImage = `-- name: CreatePostImage :one
+INSERT INTO post_images(post_id, image_url)
+VALUES ($1, $2) RETURNING id, post_id, image_url, created_at
+`
+
+type CreatePostImageParams struct {
+	PostID   pgtype.UUID
+	ImageUrl string
+}
+
+func (q *Queries) CreatePostImage(ctx context.Context, arg CreatePostImageParams) (PostImage, error) {
+	row := q.db.QueryRow(ctx, createPostImage, arg.PostID, arg.ImageUrl)
+	var i PostImage
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.ImageUrl,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deletePost = `-- name: DeletePost :exec
 DELETE FROM posts WHERE id = $1
 `

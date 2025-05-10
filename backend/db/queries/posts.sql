@@ -132,3 +132,7 @@ SELECT * from categories;
 -- name: CreateCategory :one
 INSERT INTO categories(name, description, endpoint, can_volunteer)
 VALUES ($1, $2, $3, $4) RETURNING *;
+
+-- name: CreatePostImage :one
+INSERT INTO post_images(post_id, image_url)
+VALUES ($1, $2) RETURNING *;

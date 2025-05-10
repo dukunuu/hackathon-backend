@@ -14,6 +14,7 @@ import (
 
 type FileStore interface {
 	UploadProfileImage(ctx context.Context, fileContent []byte, originalFilename string, contentType string, userID uuid.UUID) (objectURL string, objectName string, err error)
+	UploadPostImage(ctx context.Context, fileContent []byte, originalFilename string, contentType string, userID uuid.UUID) (objectURL string, objectName string, err error)
 	DeleteObject(ctx context.Context, objectName string) error // Optional: for rollbacks or deletions
 }
 

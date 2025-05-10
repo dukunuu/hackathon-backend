@@ -38,42 +38,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  server.CreatePostRequest:
-    properties:
-      address_text:
-        example: Peace Avenue, Ulaanbaatar
-        type: string
-      category_id:
-        format: uuid
-        type: string
-      description:
-        example: The local park needs volunteers for a cleanup drive.
-        type: string
-      location_lat:
-        example: 47.9187
-        type: number
-      location_lng:
-        example: 106.917
-        type: number
-      max_volunteers:
-        example: 10
-        type: integer
-      post_type:
-        example: хандив
-        type: string
-      preview_url:
-        example: http://example.com/image.jpg
-        type: string
-      priority:
-        example: дунд
-        type: string
-      status:
-        example: Хүлээгдэж байгаа
-        type: string
-      title:
-        example: Need help cleaning the park
-        type: string
-    type: object
   server.ErrorResponse:
     properties:
       error:
@@ -393,15 +357,22 @@ paths:
       - Posts
     post:
       consumes:
-      - application/json
-      description: Creates a new post. The authenticated user will be the owner.
+      - multipart/form-data
+      description: |-
+        Creates a new post. The authenticated user will be the owner.
+        Post details are sent as a JSON string in the 'postData' form field.
+        Optionally, up to 5 images can be uploaded via the 'postImages' form field.
       parameters:
-      - description: Post creation details
-        in: body
+      - description: 'Post creation details as a JSON string. Example: ''{\'
+        in: formData
         name: postData
         required: true
-        schema:
-          $ref: '#/definitions/server.CreatePostRequest'
+        type: string
+      - description: 'Optional post image files (max 5MB each, up to 5 files, types:
+          jpeg, png, gif, webp)'
+        in: formData
+        name: postImages
+        type: file
       produces:
       - application/json
       responses:
@@ -410,7 +381,8 @@ paths:
           schema:
             $ref: '#/definitions/server.PostResponseDTO'
         "400":
-          description: Invalid request payload or missing required fields
+          description: Invalid request (e.g., missing 'postData', invalid JSON, invalid
+            image, too many images, missing required fields in postData)
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "401":
@@ -418,12 +390,13 @@ paths:
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "500":
-          description: Failed to create post
+          description: Internal server error (e.g., failed to upload image, or create
+            post/post_image record)
           schema:
             $ref: '#/definitions/server.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a new post
+      summary: Create a new post (with optional images)
       tags:
       - Posts
   /posts/{postId}:

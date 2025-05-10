@@ -199,9 +199,9 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new post. The authenticated user will be the owner.",
+                "description": "Creates a new post. The authenticated user will be the owner.\nPost details are sent as a JSON string in the 'postData' form field.\nOptionally, up to 5 images can be uploaded via the 'postImages' form field.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -209,16 +209,20 @@ const docTemplate = `{
                 "tags": [
                     "Posts"
                 ],
-                "summary": "Create a new post",
+                "summary": "Create a new post (with optional images)",
                 "parameters": [
                     {
-                        "description": "Post creation details",
+                        "type": "string",
+                        "description": "Post creation details as a JSON string. Example: '{\\",
                         "name": "postData",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/server.CreatePostRequest"
-                        }
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Optional post image files (max 5MB each, up to 5 files, types: jpeg, png, gif, webp)",
+                        "name": "postImages",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -229,7 +233,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request payload or missing required fields",
+                        "description": "Invalid request (e.g., missing 'postData', invalid JSON, invalid image, too many images, missing required fields in postData)",
                         "schema": {
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
@@ -241,7 +245,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Failed to create post",
+                        "description": "Internal server error (e.g., failed to upload image, or create post/post_image record)",
                         "schema": {
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
@@ -1361,55 +1365,6 @@ const docTemplate = `{
                 }
             }
         },
-        "server.CreatePostRequest": {
-            "type": "object",
-            "properties": {
-                "address_text": {
-                    "type": "string",
-                    "example": "Peace Avenue, Ulaanbaatar"
-                },
-                "category_id": {
-                    "type": "string",
-                    "format": "uuid"
-                },
-                "description": {
-                    "type": "string",
-                    "example": "The local park needs volunteers for a cleanup drive."
-                },
-                "location_lat": {
-                    "type": "number",
-                    "example": 47.9187
-                },
-                "location_lng": {
-                    "type": "number",
-                    "example": 106.917
-                },
-                "max_volunteers": {
-                    "type": "integer",
-                    "example": 10
-                },
-                "post_type": {
-                    "type": "string",
-                    "example": "хандив"
-                },
-                "preview_url": {
-                    "type": "string",
-                    "example": "http://example.com/image.jpg"
-                },
-                "priority": {
-                    "type": "string",
-                    "example": "дунд"
-                },
-                "status": {
-                    "type": "string",
-                    "example": "Хүлээгдэж байгаа"
-                },
-                "title": {
-                    "type": "string",
-                    "example": "Need help cleaning the park"
-                }
-            }
-        },
         "server.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1696,7 +1651,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             ":8080",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Hackathon Backend API",
