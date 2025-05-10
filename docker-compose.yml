@@ -1,0 +1,77 @@
+services:
+  go_app:
+    image: dukunuu/devtools:latest
+    container_name: go_app
+    volumes:
+      - ./backend/:/src:cached
+    working_dir: /src/
+    env_file:
+      - ./backend/.env
+    entrypoint: ["sh", "-c"]
+    command: |
+      "go mod download && air -c .air.toml"
+    depends_on: 
+      postgres_db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - app_network
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - 11434:11434
+    container_name: ollama
+    networks:
+      - app_network 
+
+  minio:
+    image: minio/minio:latest # Using a specific recent release
+    container_name: hackathon_minio
+    ports:
+      - "9000:9000" # MinIO API port
+      - "9001:9001" # MinIO Console port
+    env_file: 
+      - "./backend/.env"
+    environment:
+      MINIO_DEFAULT_BUCKET: "hackathon"
+    volumes:
+      - minio_data:/data # Persist data
+    command: server /data --console-address ":9001"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 20s
+      retries: 3
+
+  postgres_db:
+    container_name: postgres_db
+    image: postgres:latest
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: app_db
+    ports:
+      - 5432:5432
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d app_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+  minio_data:
+  src:
+
+networks:
+  app_network:

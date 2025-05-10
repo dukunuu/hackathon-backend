@@ -1,0 +1,484 @@
+basePath: /api/v1
+definitions:
+  server.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  server.LoginRequestPayload:
+    properties:
+      email:
+        example: john.doe@example.com
+        type: string
+      password:
+        example: strongpassword123
+        type: string
+    type: object
+  server.LoginResponsePayloadDTO:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user:
+        $ref: '#/definitions/server.UserResponseDTO'
+    type: object
+  server.UpdateUserDetailsRequest:
+    properties:
+      first_name:
+        example: John
+        type: string
+      is_volunteering:
+        example: true
+        type: boolean
+      last_name:
+        example: Doe
+        type: string
+      phone:
+        example: 123-456-7890
+        type: string
+      profile_url:
+        example: http://example.com/new_profile.jpg
+        type: string
+    type: object
+  server.UpdateUserEmailRequest:
+    properties:
+      email:
+        example: new.email@example.com
+        type: string
+    type: object
+  server.UpdateUserPasswordRequest:
+    properties:
+      new_password:
+        example: newStrongPassword456
+        type: string
+    type: object
+  server.UserResponseDTO:
+    properties:
+      created_at:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      email:
+        example: john.doe@example.com
+        type: string
+      first_name:
+        example: John
+        type: string
+      id:
+        example: a1b2c3d4-e5f6-7777-8888-99990000abcd
+        type: string
+      is_volunteering:
+        example: false
+        type: boolean
+      last_name:
+        example: Doe
+        type: string
+      phone:
+        example: "99119911"
+        type: string
+      profile_url:
+        example: http://example.com/profile.jpg
+        type: string
+      role:
+        description: Changed from interface{} to string
+        example: USER
+        type: string
+      updated_at:
+        example: "2023-01-01T13:00:00Z"
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server for a hackathon backend.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Hackathon Backend API
+  version: "1.0"
+paths:
+  /users:
+    get:
+      description: 'Retrieves a list of all users. (Note: Consider pagination for
+        large datasets and admin-only access)'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved list of users
+          schema:
+            items:
+              $ref: '#/definitions/server.UserResponseDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to list users
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all users
+      tags:
+      - Users
+  /users/{userID}:
+    delete:
+      description: Deletes a user account. Authenticated user can delete their own
+        account. (Admin functionality can be added).
+      parameters:
+      - description: User ID of the account to delete
+        format: uuid
+        in: path
+        name: userID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: User deleted successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid user ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - cannot delete another user's account
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User not found to delete
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to delete user
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete user by ID
+      tags:
+      - Users
+    get:
+      description: Retrieves user details for a given user ID.
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: userID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "400":
+          description: Invalid user ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to get user
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - Users
+  /users/by-email:
+    get:
+      description: Retrieves user details for a given email address. (Consider admin-only
+        access).
+      parameters:
+      - description: Email address of the user
+        example: '"jane.doe@example.com"'
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "400":
+          description: Email query parameter is required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User with this email not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to get user by email
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by email
+      tags:
+      - Users
+  /users/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user with email and password, returns a JWT token
+        and user details.
+      parameters:
+      - description: User login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/server.LoginRequestPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged in
+          schema:
+            $ref: '#/definitions/server.LoginResponsePayloadDTO'
+        "400":
+          description: Invalid request payload or missing fields
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Invalid email or password
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Login failed or failed to generate token
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Login a user
+      tags:
+      - Authentication
+  /users/me:
+    get:
+      description: Retrieves details for the currently authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "401":
+          description: Authentication required or user not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to get user
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Users
+  /users/me/details:
+    put:
+      consumes:
+      - application/json
+      description: Updates the first name, last name, phone, volunteering status,
+        and profile URL for the authenticated user.
+      parameters:
+      - description: User details to update
+        in: body
+        name: userDetails
+        required: true
+        schema:
+          $ref: '#/definitions/server.UpdateUserDetailsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated user details
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User not found to update
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to update user details
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update current user's details
+      tags:
+      - Users
+  /users/me/email:
+    put:
+      consumes:
+      - application/json
+      description: Updates the email address for the authenticated user. May require
+        re-verification in a real application.
+      parameters:
+      - description: New email address
+        in: body
+        name: emailUpdate
+        required: true
+        schema:
+          $ref: '#/definitions/server.UpdateUserEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated user email
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "400":
+          description: Invalid request payload or email empty
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User not found to update email
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: This email is already in use
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to update user email
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update current user's email
+      tags:
+      - Users
+  /users/me/password:
+    put:
+      consumes:
+      - application/json
+      description: Updates the password for the authenticated user.
+      parameters:
+      - description: New password
+        in: body
+        name: passwordUpdate
+        required: true
+        schema:
+          $ref: '#/definitions/server.UpdateUserPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Password updated successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request payload or new password empty
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: User not found to update password
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to hash new password or update user password
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update current user's password
+      tags:
+      - Users
+  /users/register:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Registers a new user. User details are sent as a JSON string in the 'userData' form field.
+        Optionally, a profile image can be uploaded via the 'profileImage' form field.
+      parameters:
+      - description: 'User registration details as a JSON string. Example: ''{\'
+        in: formData
+        name: userData
+        required: true
+        type: string
+      - description: 'Optional profile image file (max 5MB, types: jpeg, png, gif,
+          webp)'
+        in: formData
+        name: profileImage
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Successfully created user
+          schema:
+            $ref: '#/definitions/server.UserResponseDTO'
+        "400":
+          description: Invalid request (e.g., missing 'userData', invalid JSON, invalid
+            image, missing required fields in userData)
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal server error (e.g., failed to hash password, upload
+            image, or create user)
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Create a new user (with optional profile image)
+      tags:
+      - Users
+securityDefinitions:
+  BearerAuth:
+    description: '"Type ''Bearer YOUR_JWT_TOKEN'' to authorize."'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
