@@ -43,24 +43,38 @@ func (s *Server) Start() {
 	r.Post("/api/v1/users/register", s.handleCreateUser)
 	r.Post("/api/v1/users/login", s.handleLogin)
 
-	r.Group(func(rauth chi.Router) {
-		rauth.Use(s.AuthMiddleware)
+	r.Get("/api/v1/posts", s.handleListPosts)
+	r.Get("/api/v1/category/{categoryId}", s.handleGetCategoryName)
+	r.Get("/api/v1/categories", s.handleGetCategories)
 
+r.Group(func(rauth chi.Router) {
+		rauth.Use(s.AuthMiddleware)
 		rauth.Get("/api/v1/users/me", s.handleGetCurrentUser)
-		rauth.Put("/api/v1/users/me/details", s.handleUpdateUserDetails) // User updates their own details
+		rauth.Put("/api/v1/users/me/details", s.handleUpdateUserDetails)
 		rauth.Put("/api/v1/users/me/email", s.handleUpdateUserEmail)
 		rauth.Put("/api/v1/users/me/password", s.handleUpdateUserPassword)
-		// rauth.Delete("/api/v1/users/me", s.handleDeleteSelf) // If you want a specific route for self-delete
 
-		// Routes that might require specific roles (e.g., admin) or operate on other users by ID
-		rauth.Get("/api/v1/users", s.handleListUsers) // Potentially admin only
+		rauth.Get("/api/v1/users", s.handleListUsers)
 		rauth.Get("/api/v1/users/{userID}", s.handleGetUserByID)
-		rauth.Delete("/api/v1/users/{userID}", s.handleDeleteUser) // User can delete self, or admin can delete others
+		rauth.Delete("/api/v1/users/{userID}", s.handleDeleteUser)
+		rauth.Get("/api/v1/users/by-email", s.handleGetUserByEmail)
 
-		// Example: Get user by email (might be admin only)
-		rauth.Get("/api/v1/users/by-email", s.handleGetUserByEmail) // e.g., /api/v1/users/by-email?email=test@example.com
+		rauth.Get("/api/v1/users/{userId}/posts", s.handleGetUserPosts)
+		rauth.Post("/api/v1/posts", s.handleCreatePost)
+
+		rauth.Get("/api/v1/posts/{postId}", s.handleGetPost)
+		rauth.Put("/api/v1/posts/{postId}", s.handleUpdatePost)
+		rauth.Delete("/api/v1/posts/{postId}", s.handleDeletePost)
+
+		rauth.Get("/api/v1/posts/volunteers", s.handleListPostVolunteers)
+
+		rauth.Delete("/api/v1/posts/volunteers/{userId}", s.handleDeletePostVolunteer)
+
+		rauth.Post("/api/v1/approve_volunteer", s.handleApproveVolunteer)
+		rauth.Post("/api/v1/reject_volunteer", s.handleRejectVolunteer)
+
+		rauth.Get("/api/v1/users/{userId}/stats", s.handleGetUserStats)
 	})
-
 	slog.Info("Server starting", "address", s.addr)
 	if err := http.ListenAndServe(s.addr, r); err != nil {
 		slog.Error("Failed to start server", "error", err)

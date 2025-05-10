@@ -24,6 +24,608 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/approve_volunteer": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Allows the owner of a post to approve a pending volunteer application.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts",
+                    "Volunteers"
+                ],
+                "summary": "Approve a volunteer for a post",
+                "parameters": [
+                    {
+                        "description": "Details of the post and volunteer to approve",
+                        "name": "approvalData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.ApproveRejectVolunteerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully approved volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.PostVolunteerDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload or missing IDs",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - not authorized to approve volunteers for this post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post or volunteer application not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to approve volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories": {
+            "get": {
+                "description": "Retrieves categories.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get categories",
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved categories",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/server.CategoryDTO"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve categories",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories/{categoryId}": {
+            "get": {
+                "description": "Retrieves category name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get category name",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Category ID",
+                        "name": "categoryId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved category name.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid category ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve category name",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/posts": {
+            "get": {
+                "description": "Retrieves a list of all posts, including associated images and volunteers.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "List all posts",
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved list of posts",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/server.PostResponseDTO"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve posts",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new post. The authenticated user will be the owner.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Create a new post",
+                "parameters": [
+                    {
+                        "description": "Post creation details",
+                        "name": "postData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.CreatePostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Successfully created post",
+                        "schema": {
+                            "$ref": "#/definitions/server.PostResponseDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload or missing required fields",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/volunteers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of all volunteer applications across all posts. (Consider admin-only access and pagination).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts",
+                    "Volunteers"
+                ],
+                "summary": "List all post volunteers",
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved list of post volunteers",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/server.PostVolunteerDTO"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve post volunteers",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/volunteers/{userId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Allows a post owner to remove a volunteer or a volunteer to remove their own application from a post.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts",
+                    "Volunteers"
+                ],
+                "summary": "Remove a volunteer from a post",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Volunteer's User ID to remove",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Post ID from which to remove the volunteer",
+                        "name": "postId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "message: Volunteer removed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID or post ID format, or missing postId query parameter",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - not authorized to remove this volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete post volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{postId}": {
+            "get": {
+                "description": "Retrieves details for a specific post, including images and volunteers.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get post by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved post",
+                        "schema": {
+                            "$ref": "#/definitions/server.PostResponseDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid post ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates details of a specific post. Only the owner of the post can update it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Update post by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Post update details",
+                        "name": "postUpdateData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.UpdatePostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully updated post",
+                        "schema": {
+                            "$ref": "#/definitions/server.PostResponseDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload or post ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - not authorized to update this post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found to update",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a specific post. Only the owner of the post can delete it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Delete post by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "message: Post deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid post ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - not authorized to delete this post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reject_volunteer": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Allows the owner of a post to reject a pending volunteer application.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts",
+                    "Volunteers"
+                ],
+                "summary": "Reject a volunteer for a post",
+                "parameters": [
+                    {
+                        "description": "Details of the post and volunteer to reject",
+                        "name": "rejectionData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.ApproveRejectVolunteerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully rejected volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.PostVolunteerDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload or missing IDs",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - not authorized to reject volunteers for this post",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Post or volunteer application not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to reject volunteer",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "get": {
                 "security": [
@@ -590,9 +1192,224 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/users/{userId}/posts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves all posts created by a specific user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get posts by user ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved user's posts",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/server.PostResponseDTO"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve user posts",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{userId}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves statistics for a specific user, including post count, volunteer count, and approved post count.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users",
+                    "Stats"
+                ],
+                "summary": "Get user statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved user statistics",
+                        "schema": {
+                            "$ref": "#/definitions/db.GetUserStatsRow"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID format",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve user stats",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "db.GetUserStatsRow": {
+            "type": "object",
+            "properties": {
+                "approvedPosts": {
+                    "type": "integer"
+                },
+                "userPostsCount": {
+                    "type": "integer"
+                },
+                "userVolunteerCount": {
+                    "type": "integer"
+                }
+            }
+        },
+        "server.ApproveRejectVolunteerRequest": {
+            "type": "object",
+            "properties": {
+                "post_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "a1b2c3d4-e5f6-7777-8888-99990000aaaa"
+                },
+                "volunteer_user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "a1b2c3d4-e5f6-7777-8888-99990000bbbb"
+                }
+            }
+        },
+        "server.CategoryDTO": {
+            "type": "object",
+            "properties": {
+                "can_volunteer": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "server.CreatePostRequest": {
+            "type": "object",
+            "properties": {
+                "address_text": {
+                    "type": "string",
+                    "example": "Peace Avenue, Ulaanbaatar"
+                },
+                "category_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "The local park needs volunteers for a cleanup drive."
+                },
+                "location_lat": {
+                    "type": "number",
+                    "example": 47.9187
+                },
+                "location_lng": {
+                    "type": "number",
+                    "example": 106.917
+                },
+                "max_volunteers": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "post_type": {
+                    "type": "string",
+                    "example": "хандив"
+                },
+                "preview_url": {
+                    "type": "string",
+                    "example": "http://example.com/image.jpg"
+                },
+                "priority": {
+                    "type": "string",
+                    "example": "дунд"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Хүлээгдэж байгаа"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Need help cleaning the park"
+                }
+            }
+        },
         "server.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -623,6 +1440,156 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/server.UserResponseDTO"
+                }
+            }
+        },
+        "server.PostResponseDTO": {
+            "type": "object",
+            "properties": {
+                "address_text": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_volunteers": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "location_lat": {
+                    "type": "number"
+                },
+                "location_lng": {
+                    "type": "number"
+                },
+                "max_volunteers": {
+                    "type": "integer"
+                },
+                "post_type": {
+                    "type": "string"
+                },
+                "preview_url": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "volunteers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/server.PostVolunteerDTO"
+                    }
+                }
+            }
+        },
+        "server.PostVolunteerDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "post_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "pending"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        },
+        "server.UpdatePostRequest": {
+            "type": "object",
+            "properties": {
+                "address_text": {
+                    "type": "string",
+                    "example": "Sukhbaatar Square, Ulaanbaatar"
+                },
+                "category_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "current_volunteers": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Updated details: The local park needs volunteers urgently."
+                },
+                "location_lat": {
+                    "type": "number",
+                    "example": 47.92
+                },
+                "location_lng": {
+                    "type": "number",
+                    "example": 106.925
+                },
+                "max_volunteers": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "post_type": {
+                    "type": "string",
+                    "example": "хандив"
+                },
+                "preview_url": {
+                    "type": "string",
+                    "example": "http://example.com/new_image.jpg"
+                },
+                "priority": {
+                    "type": "string",
+                    "example": "өндөр"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Шийдвэрлэгдэж байгаа"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Urgent: Park Cleanup Drive"
                 }
             }
         },

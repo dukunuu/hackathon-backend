@@ -1,0 +1,102 @@
+services:
+  go-app:
+    build:
+      context: ./backend # Path to the directory containing your Go app's Dockerfile
+      dockerfile: Dockerfile # Assumes your production Dockerfile is named 'Dockerfile'
+    container_name: go-app
+    image: dukunuu/go-app
+    env_file:
+      - ./backend/.env.prod
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080" # Expose your Go app's port (assuming it listens on 8000 internally)
+    networks:
+      - app_network
+
+  ollama:
+    image: ollama/ollama:0.1.32 # Use a specific version instead of latest
+    container_name: ollama-prod
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - app_network
+
+  migrate:
+    image: dukunuu/go-app # Uses the image built by the go-app service
+    container_name: go-app-migrate
+    env_file:
+      - ./backend/.env.prod # For DB_URL
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - app_network
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+        echo 'Migration service started. Waiting a few seconds for DB to fully stabilize...';
+        sleep 5;
+        echo 'Running database migrations...';
+        /usr/local/bin/migrate -source file://./migrations -database \"$${DB_URL}\" up;
+        echo 'Database migrations finished.';
+      "
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1 # Specific version
+    container_name: minio-prod
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - ./backend/.env.prod
+    environment:
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET_NAME:-user-profiles} # Default if not in .env.prod
+    volumes:
+      - minio_data_prod:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+
+
+
+  postgres-db:
+    container_name: postgres-db-prod
+    image: postgres:15-alpine # Specific version, alpine for smaller size
+    restart: always
+    volumes:
+      - db_data_prod:/var/lib/postgresql/data
+    env_file:
+      - ./backend/.env.prod # Postgres specific env vars (POSTGRES_USER, etc.)
+    ports:
+      - "5432:5432" # Be cautious exposing DB ports directly in production
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-app_db}"]
+      interval: 30s # Increased interval
+      timeout: 10s
+      retries: 5
+
+volumes:
+  db_data_prod: {}
+  minio_data_prod: {}
+  ollama_data: {} # If you added a volume for Ollama
+
+networks:
+  app_network:
+    driver: bridge

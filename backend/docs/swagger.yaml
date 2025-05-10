@@ -1,5 +1,79 @@
 basePath: /api/v1
 definitions:
+  db.GetUserStatsRow:
+    properties:
+      approvedPosts:
+        type: integer
+      userPostsCount:
+        type: integer
+      userVolunteerCount:
+        type: integer
+    type: object
+  server.ApproveRejectVolunteerRequest:
+    properties:
+      post_id:
+        example: a1b2c3d4-e5f6-7777-8888-99990000aaaa
+        format: uuid
+        type: string
+      volunteer_user_id:
+        example: a1b2c3d4-e5f6-7777-8888-99990000bbbb
+        format: uuid
+        type: string
+    type: object
+  server.CategoryDTO:
+    properties:
+      can_volunteer:
+        type: boolean
+      created_at:
+        type: string
+      description:
+        type: string
+      endpoint:
+        type: string
+      id:
+        format: uuid
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  server.CreatePostRequest:
+    properties:
+      address_text:
+        example: Peace Avenue, Ulaanbaatar
+        type: string
+      category_id:
+        format: uuid
+        type: string
+      description:
+        example: The local park needs volunteers for a cleanup drive.
+        type: string
+      location_lat:
+        example: 47.9187
+        type: number
+      location_lng:
+        example: 106.917
+        type: number
+      max_volunteers:
+        example: 10
+        type: integer
+      post_type:
+        example: хандив
+        type: string
+      preview_url:
+        example: http://example.com/image.jpg
+        type: string
+      priority:
+        example: дунд
+        type: string
+      status:
+        example: Хүлээгдэж байгаа
+        type: string
+      title:
+        example: Need help cleaning the park
+        type: string
+    type: object
   server.ErrorResponse:
     properties:
       error:
@@ -21,6 +95,111 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/server.UserResponseDTO'
+    type: object
+  server.PostResponseDTO:
+    properties:
+      address_text:
+        type: string
+      category_id:
+        type: string
+      created_at:
+        type: string
+      current_volunteers:
+        type: integer
+      description:
+        type: string
+      id:
+        format: uuid
+        type: string
+      images:
+        items:
+          type: string
+        type: array
+      location_lat:
+        type: number
+      location_lng:
+        type: number
+      max_volunteers:
+        type: integer
+      post_type:
+        type: string
+      preview_url:
+        type: string
+      priority:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        format: uuid
+        type: string
+      volunteers:
+        items:
+          $ref: '#/definitions/server.PostVolunteerDTO'
+        type: array
+    type: object
+  server.PostVolunteerDTO:
+    properties:
+      created_at:
+        type: string
+      id:
+        format: uuid
+        type: string
+      notes:
+        type: string
+      post_id:
+        format: uuid
+        type: string
+      status:
+        example: pending
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        format: uuid
+        type: string
+    type: object
+  server.UpdatePostRequest:
+    properties:
+      address_text:
+        example: Sukhbaatar Square, Ulaanbaatar
+        type: string
+      category_id:
+        format: uuid
+        type: string
+      current_volunteers:
+        example: 5
+        type: integer
+      description:
+        example: 'Updated details: The local park needs volunteers urgently.'
+        type: string
+      location_lat:
+        example: 47.92
+        type: number
+      location_lng:
+        example: 106.925
+        type: number
+      max_volunteers:
+        example: 15
+        type: integer
+      post_type:
+        example: хандив
+        type: string
+      preview_url:
+        example: http://example.com/new_image.jpg
+        type: string
+      priority:
+        example: өндөр
+        type: string
+      status:
+        example: Шийдвэрлэгдэж байгаа
+        type: string
+      title:
+        example: 'Urgent: Park Cleanup Drive'
+        type: string
     type: object
   server.UpdateUserDetailsRequest:
     properties:
@@ -100,6 +279,404 @@ info:
   title: Hackathon Backend API
   version: "1.0"
 paths:
+  /approve_volunteer:
+    post:
+      consumes:
+      - application/json
+      description: Allows the owner of a post to approve a pending volunteer application.
+      parameters:
+      - description: Details of the post and volunteer to approve
+        in: body
+        name: approvalData
+        required: true
+        schema:
+          $ref: '#/definitions/server.ApproveRejectVolunteerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully approved volunteer
+          schema:
+            $ref: '#/definitions/server.PostVolunteerDTO'
+        "400":
+          description: Invalid request payload or missing IDs
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - not authorized to approve volunteers for this post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post or volunteer application not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to approve volunteer
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve a volunteer for a post
+      tags:
+      - Posts
+      - Volunteers
+  /categories:
+    get:
+      description: Retrieves categories.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved categories
+          schema:
+            items:
+              $ref: '#/definitions/server.CategoryDTO'
+            type: array
+        "500":
+          description: Failed to retrieve categories
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get categories
+      tags:
+      - Categories
+  /categories/{categoryId}:
+    get:
+      description: Retrieves category name.
+      parameters:
+      - description: Category ID
+        format: uuid
+        in: path
+        name: categoryId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved category name.
+          schema:
+            type: string
+        "400":
+          description: Invalid category ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to retrieve category name
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get category name
+      tags:
+      - Categories
+  /posts:
+    get:
+      description: Retrieves a list of all posts, including associated images and
+        volunteers.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved list of posts
+          schema:
+            items:
+              $ref: '#/definitions/server.PostResponseDTO'
+            type: array
+        "500":
+          description: Failed to retrieve posts
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List all posts
+      tags:
+      - Posts
+    post:
+      consumes:
+      - application/json
+      description: Creates a new post. The authenticated user will be the owner.
+      parameters:
+      - description: Post creation details
+        in: body
+        name: postData
+        required: true
+        schema:
+          $ref: '#/definitions/server.CreatePostRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Successfully created post
+          schema:
+            $ref: '#/definitions/server.PostResponseDTO'
+        "400":
+          description: Invalid request payload or missing required fields
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to create post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new post
+      tags:
+      - Posts
+  /posts/{postId}:
+    delete:
+      description: Deletes a specific post. Only the owner of the post can delete
+        it.
+      parameters:
+      - description: Post ID
+        format: uuid
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Post deleted successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid post ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - not authorized to delete this post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to delete post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete post by ID
+      tags:
+      - Posts
+    get:
+      description: Retrieves details for a specific post, including images and volunteers.
+      parameters:
+      - description: Post ID
+        format: uuid
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved post
+          schema:
+            $ref: '#/definitions/server.PostResponseDTO'
+        "400":
+          description: Invalid post ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to retrieve post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get post by ID
+      tags:
+      - Posts
+    put:
+      consumes:
+      - application/json
+      description: Updates details of a specific post. Only the owner of the post
+        can update it.
+      parameters:
+      - description: Post ID
+        format: uuid
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Post update details
+        in: body
+        name: postUpdateData
+        required: true
+        schema:
+          $ref: '#/definitions/server.UpdatePostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated post
+          schema:
+            $ref: '#/definitions/server.PostResponseDTO'
+        "400":
+          description: Invalid request payload or post ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - not authorized to update this post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post not found to update
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to update post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update post by ID
+      tags:
+      - Posts
+  /posts/volunteers:
+    get:
+      description: Retrieves a list of all volunteer applications across all posts.
+        (Consider admin-only access and pagination).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved list of post volunteers
+          schema:
+            items:
+              $ref: '#/definitions/server.PostVolunteerDTO'
+            type: array
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to retrieve post volunteers
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all post volunteers
+      tags:
+      - Posts
+      - Volunteers
+  /posts/volunteers/{userId}:
+    delete:
+      description: Allows a post owner to remove a volunteer or a volunteer to remove
+        their own application from a post.
+      parameters:
+      - description: Volunteer's User ID to remove
+        format: uuid
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Post ID from which to remove the volunteer
+        format: uuid
+        in: query
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Volunteer removed successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid user ID or post ID format, or missing postId query
+            parameter
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - not authorized to remove this volunteer
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to delete post volunteer
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a volunteer from a post
+      tags:
+      - Posts
+      - Volunteers
+  /reject_volunteer:
+    post:
+      consumes:
+      - application/json
+      description: Allows the owner of a post to reject a pending volunteer application.
+      parameters:
+      - description: Details of the post and volunteer to reject
+        in: body
+        name: rejectionData
+        required: true
+        schema:
+          $ref: '#/definitions/server.ApproveRejectVolunteerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully rejected volunteer
+          schema:
+            $ref: '#/definitions/server.PostVolunteerDTO'
+        "400":
+          description: Invalid request payload or missing IDs
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: Forbidden - not authorized to reject volunteers for this post
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Post or volunteer application not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to reject volunteer
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject a volunteer for a post
+      tags:
+      - Posts
+      - Volunteers
   /users:
     get:
       description: 'Retrieves a list of all users. (Note: Consider pagination for
@@ -208,6 +785,78 @@ paths:
       summary: Get user by ID
       tags:
       - Users
+  /users/{userId}/posts:
+    get:
+      description: Retrieves all posts created by a specific user.
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user's posts
+          schema:
+            items:
+              $ref: '#/definitions/server.PostResponseDTO'
+            type: array
+        "400":
+          description: Invalid user ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to retrieve user posts
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get posts by user ID
+      tags:
+      - Posts
+  /users/{userId}/stats:
+    get:
+      description: Retrieves statistics for a specific user, including post count,
+        volunteer count, and approved post count.
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user statistics
+          schema:
+            $ref: '#/definitions/db.GetUserStatsRow'
+        "400":
+          description: Invalid user ID format
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Failed to retrieve user stats
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user statistics
+      tags:
+      - Users
+      - Stats
   /users/by-email:
     get:
       description: Retrieves user details for a given email address. (Consider admin-only

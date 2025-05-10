@@ -3,8 +3,10 @@ GO := go
 GO_MODULE := "github.com/dukunuu/hackathon_backend"
 DOCKER_COMPOSE_FILE := docker-compose.yml
 GO_APP_SERVICE_NAME := go_app
+GO_APP_PROD := go-app
 
-DOCKER_EXEC := docker-compose exec -T $(GO_APP_SERVICE_NAME)
+DOCKER_EXEC := docker compose exec -T $(GO_APP_SERVICE_NAME)
+DOCKER_EXEC_PROD := docker compose -f docker-compose.prod.yml exec -T $(GO_APP_PROD)
 MIGRATIONS_DIR_CONTAINER := ./db/schema/
 
 .DEFAULT_GOAL := help
@@ -44,6 +46,17 @@ migrate-down:
 		$(DOCKER_EXEC) sh -c 'migrate -path $(MIGRATIONS_DIR_CONTAINER) -database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres_db:5432/$${POSTGRES_DB}?sslmode=disable" down $(VERSION)'; \
 	fi
 	@echo "==> Migrations DOWN complete."
+
+migrate-up-prod:
+	@echo "==> Applying database migrations (UP)..."
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Applying all pending UP migrations..."; \
+		$(DOCKER_EXEC_PROD) sh -c 'migrate -path $(MIGRATIONS_DIR_CONTAINER) -database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres_db:5432/$${POSTGRES_DB}?sslmode=disable" up'; \
+	else \
+		echo "Applying UP migrations to version $(VERSION)..."; \
+		$(DOCKER_EXEC_PROD) sh -c 'migrate -path $(MIGRATIONS_DIR_CONTAINER) -database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres_db:5432/$${POSTGRES_DB}?sslmode=disable" up $(VERSION)'; \
+	fi
+	@echo "==> Migrations UP complete."
 
 .PHONY: migrate-create migrate-up migrate-down help
 

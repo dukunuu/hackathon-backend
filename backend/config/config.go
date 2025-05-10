@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	DB_URL               string
+	ENV                  string
 	HOST                 string
 	JWT_SECRET           string
 	MINIO_ENDPOINT       string
@@ -16,10 +17,15 @@ type Config struct {
 	MINIO_BUCKET_NAME    string
 	MINIO_USE_SSL        bool
 	MINIO_PUBLIC_URL_BASE string // Optional: If your MinIO access is behind a different public URL/CDN
+
+	// Add Ollama configuration fields
+	OLLAMA_ADDR          string
+	OLLAMA_MODEL_NAME    string
+	OLLAMA_SYSTEM_PROMPT string
 }
 
-
 func LoadConfig() (*Config, error) {
+	appEnv := common.GetString("ENV", "development")
 	dbUrl := common.GetString("DB_URL", "")
 	if dbUrl == "" {
 		return nil, fmt.Errorf("could not load env DB_URL")
@@ -35,7 +41,6 @@ func LoadConfig() (*Config, error) {
 	minioUseSSL := common.GetBool("MINIO_USE_SSL", false)
 	minioPublicURLBase := common.GetString("MINIO_PUBLIC_URL_BASE", "")
 
-
 	if minioEndpoint == "" || minioAccessKey == "" || minioSecretKey == "" || minioBucket == "" {
 		return nil, fmt.Errorf("MINIO_ENDPOINT, MINIO_ACCESS_KEY_ID, MINIO_SECRET_ACCESS_KEY, and MINIO_BUCKET_NAME must be set")
 	}
@@ -50,7 +55,18 @@ func LoadConfig() (*Config, error) {
 	}
     minioPublicURLBase = common.TrimSuffix(minioPublicURLBase, "/") // Assuming common.TrimSuffix exists
 
+
+	// Load Ollama configuration
+	ollamaAddr := common.GetString("OLLAMA_ADDR", "http://localhost:11434") // Default Ollama address
+	ollamaModelName := common.GetString("OLLAMA_MODEL_NAME", "llama3")      // Default model name
+	ollamaSystemPrompt := common.GetString("OLLAMA_SYSTEM_PROMPT", "")    // Default system prompt
+
+	if ollamaModelName == "" {
+		return nil, fmt.Errorf("OLLAMA_MODEL_NAME must be set")
+	}
+
 	return &Config{
+		ENV:                     appEnv,
 		DB_URL:                  dbUrl,
 		HOST:                    addr,
 		JWT_SECRET:              jwt,
@@ -60,6 +76,11 @@ func LoadConfig() (*Config, error) {
 		MINIO_BUCKET_NAME:       minioBucket,
 		MINIO_USE_SSL:           minioUseSSL,
 		MINIO_PUBLIC_URL_BASE:   minioPublicURLBase,
+
+		// Assign Ollama values
+		OLLAMA_ADDR:          ollamaAddr,
+		OLLAMA_MODEL_NAME:    ollamaModelName,
+		OLLAMA_SYSTEM_PROMPT: ollamaSystemPrompt,
 	}, nil
 }
 

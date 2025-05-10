@@ -11,6 +11,136 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type PostPriority string
+
+const (
+	PostPriorityValue0 PostPriority = "өндөр"
+	PostPriorityValue1 PostPriority = "дунд"
+	PostPriorityValue2 PostPriority = "бага"
+)
+
+func (e *PostPriority) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PostPriority(s)
+	case string:
+		*e = PostPriority(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PostPriority: %T", src)
+	}
+	return nil
+}
+
+type NullPostPriority struct {
+	PostPriority PostPriority
+	Valid        bool // Valid is true if PostPriority is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPostPriority) Scan(value interface{}) error {
+	if value == nil {
+		ns.PostPriority, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PostPriority.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPostPriority) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PostPriority), nil
+}
+
+type PostStatus string
+
+const (
+	PostStatusValue0 PostStatus = "Шийдвэрлэгдсэн"
+	PostStatusValue1 PostStatus = "Түр завсарласан"
+	PostStatusValue2 PostStatus = "Цуцлагдсан"
+	PostStatusValue3 PostStatus = "Шийдвэрлэгдэж байгаа"
+	PostStatusValue4 PostStatus = "Хүлээгдэж байгаа"
+)
+
+func (e *PostStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PostStatus(s)
+	case string:
+		*e = PostStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PostStatus: %T", src)
+	}
+	return nil
+}
+
+type NullPostStatus struct {
+	PostStatus PostStatus
+	Valid      bool // Valid is true if PostStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPostStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.PostStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PostStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPostStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PostStatus), nil
+}
+
+type PostType string
+
+const (
+	PostTypeValue0 PostType = "хандив"
+	PostTypeValue1 PostType = "гомдол"
+)
+
+func (e *PostType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PostType(s)
+	case string:
+		*e = PostType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PostType: %T", src)
+	}
+	return nil
+}
+
+type NullPostType struct {
+	PostType PostType
+	Valid    bool // Valid is true if PostType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPostType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PostType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PostType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPostType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PostType), nil
+}
+
 type UserRole string
 
 const (
@@ -51,6 +181,96 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserRole), nil
+}
+
+type VolunteerStatus string
+
+const (
+	VolunteerStatusPending   VolunteerStatus = "pending"
+	VolunteerStatusApproved  VolunteerStatus = "approved"
+	VolunteerStatusCompleted VolunteerStatus = "completed"
+	VolunteerStatusRejected  VolunteerStatus = "rejected"
+)
+
+func (e *VolunteerStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = VolunteerStatus(s)
+	case string:
+		*e = VolunteerStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for VolunteerStatus: %T", src)
+	}
+	return nil
+}
+
+type NullVolunteerStatus struct {
+	VolunteerStatus VolunteerStatus
+	Valid           bool // Valid is true if VolunteerStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullVolunteerStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.VolunteerStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.VolunteerStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullVolunteerStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.VolunteerStatus), nil
+}
+
+type Category struct {
+	ID           pgtype.UUID
+	Name         string
+	Description  pgtype.Text
+	Endpoint     string
+	CanVolunteer pgtype.Bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type Post struct {
+	ID                pgtype.UUID
+	Title             string
+	Description       string
+	Status            PostStatus
+	Priority          PostPriority
+	PreviewUrl        pgtype.Text
+	PostType          PostType
+	UserID            pgtype.UUID
+	MaxVolunteers     int32
+	CurrentVolunteers int32
+	CategoryID        pgtype.UUID
+	LocationLat       pgtype.Float8
+	LocationLng       pgtype.Float8
+	AddressText       pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+type PostImage struct {
+	ID        pgtype.UUID
+	PostID    pgtype.UUID
+	ImageUrl  string
+	CreatedAt pgtype.Timestamptz
+}
+
+type PostVolunteer struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	PostID    pgtype.UUID
+	Status    pgtype.Text
+	Notes     pgtype.Text
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
 
 type User struct {
