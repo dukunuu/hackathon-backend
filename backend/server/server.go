@@ -15,12 +15,12 @@ import (
 
 type Server struct {
 	db        *db.Queries
-	filestore file.FileStore
+	filestore *file.MinioStore
 	addr      string
 	jwtSecret string
 }
 
-func Init(addr, jwtSecret string, database *db.Queries, filestore file.FileStore) *Server {
+func Init(addr, jwtSecret string, database *db.Queries, filestore *file.MinioStore) *Server {
 	return &Server{
 		db:        database,
 		addr:      addr,

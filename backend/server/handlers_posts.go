@@ -201,7 +201,7 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		tempEntityIDForPath := uuid.New() // Or authUserID.UUID
 		// Assuming s.filestore.UploadPostImage is similar to UploadProfileImage
 		// It might take a general entity ID for path construction if the specific post ID isn't used yet.
-		uploadedURL, _, uploadErr := s.filestore.UploadPostImage(r.Context(), fileBytes, handler.Filename, contentType, tempEntityIDForPath)
+		uploadedURL, _, uploadErr := s.filestore.UploadProfileImage(r.Context(), fileBytes, handler.Filename, contentType, tempEntityIDForPath)
 		if uploadErr != nil {
 			slog.Error("Failed to upload post image via filestore", "filename", handler.Filename, "error", uploadErr)
 			respondWithError(w, http.StatusInternalServerError, "Could not upload image '"+handler.Filename+"': "+uploadErr.Error())
