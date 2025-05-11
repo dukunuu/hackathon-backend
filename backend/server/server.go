@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/dukunuu/hackathon_backend/ai"
 	"github.com/dukunuu/hackathon_backend/db"
 	"github.com/dukunuu/hackathon_backend/file"
 	"github.com/go-chi/chi/v5"
@@ -18,14 +19,16 @@ type Server struct {
 	filestore *file.MinioStore
 	addr      string
 	jwtSecret string
+	aiModel   *ai.OllamaModel // Add the AI model
 }
 
-func Init(addr, jwtSecret string, database *db.Queries, filestore *file.MinioStore) *Server {
+func Init(addr, jwtSecret string, database *db.Queries, filestore *file.MinioStore, aiModel *ai.OllamaModel) *Server {
 	return &Server{
 		db:        database,
 		addr:      addr,
 		jwtSecret: jwtSecret,
 		filestore: filestore,
+		aiModel: aiModel,
 	}
 }
 func (s *Server) Start() {

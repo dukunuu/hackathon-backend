@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/dukunuu/hackathon_backend/db" // ADJUST THIS IMPORT PATH
 	"github.com/google/uuid"
@@ -93,22 +94,23 @@ func (s *Server) handleListPosts(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, responseDTOs)
 }
 
-// handleCreatePost creates a new post, optionally with images.
-// @Summary Create a new post (with optional images)
+// handleCreatePost creates a new post, optionally with images and AI categorization.
+// @Summary Create a new post (with optional images and AI categorization)
 // @Description Creates a new post. The authenticated user will be the owner.
 // @Description Post details are sent as a JSON string in the 'postData' form field.
 // @Description Optionally, up to 5 images can be uploaded via the 'postImages' form field.
+// @Description The post description will be used to automatically categorize the post using AI.
 // @Tags Posts
 // @Accept multipart/form-data
 // @Produce json
-// @Param postData formData string true "Post creation details as a JSON string. Example: '{\"title\":\"New Event\", \"description\":\"Event details here\", \"post_type\":\"event\"}'"
+// @Param postData formData string true "Post creation details as a JSON string. Example: '{\"title\":\"New Event\", \"description\":\"Event details here for AI categorization\", \"post_type\":\"event\"}'"
 // @Param postImages formData file false "Optional post image files (max 5MB each, up to 5 files, types: jpeg, png, gif, webp)"
 // @Success 201 {object} PostResponseDTO "Successfully created post"
-// @Failure 400 {object} ErrorResponse "Invalid request (e.g., missing 'postData', invalid JSON, invalid image, too many images, missing required fields in postData)"
+// @Failure 400 {object} ErrorResponse "Invalid request"
 // @Failure 401 {object} ErrorResponse "Authentication required"
-// @Failure 500 {object} ErrorResponse "Internal server error (e.g., failed to upload image, or create post/post_image record)"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Security BearerAuth
-// @Router /posts [post]
+// @Router /posts [post] // Assuming this is defined in your main router setup
 func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	authUserID, err := getUserIDFromContext(r.Context())
 	if err != nil {
@@ -118,11 +120,14 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseMultipartForm(maxPostRequestSize); err != nil {
 		slog.Error("Failed to parse multipart form for post creation", "error", err)
-		respondWithError(w, http.StatusBadRequest, "Could not parse form: "+err.Error())
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			"Could not parse form: "+err.Error(),
+		)
 		return
 	}
 
-	// 1. Get and parse the 'postData' JSON string field
 	postDataJSON := r.FormValue("postData")
 	if postDataJSON == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing 'postData' form field.")
@@ -131,148 +136,371 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 
 	var req CreatePostRequest
 	if err := json.Unmarshal([]byte(postDataJSON), &req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid JSON in 'postData' field: "+err.Error())
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			"Invalid JSON in 'postData' field: "+err.Error(),
+		)
 		return
 	}
 
-	// Validate required fields from the parsed JSON
 	if req.Title == "" || req.Description == "" || req.PostType == "" {
-		respondWithError(w, http.StatusBadRequest, "Missing required fields in 'postData': title, description, post_type")
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			"Missing required fields in 'postData': title, description, post_type",
+		)
 		return
 	}
 
-	// 2. Handle optional image uploads
+	// --- AI Categorization ---
+	var chosenCategoryID pgtype.UUID // Assuming CategoryID in DB is UUID and nullable
+
+	if s.aiModel != nil && req.Description != "" {
+		slog.Info("Attempting AI categorization for new post", "user_id", authUserID)
+		dbCategories, dbErr := s.db.GetCategories(r.Context()) // Ensure this method exists
+		if dbErr != nil {
+			slog.Error(
+				"Failed to fetch categories for AI",
+				"error",
+				dbErr,
+				"user_id",
+				authUserID,
+			)
+			// Decide: continue without category, or error out?
+			// For now, log and continue. Post will be created without AI category.
+		} else if len(dbCategories) == 0 {
+			slog.Warn(
+				"No categories found in DB for AI categorization.",
+				"user_id",
+				authUserID,
+			)
+		} else {
+			var categoryNames []string
+			categoryMapByName := make(map[string]uuid.UUID) // Map lowercase name to ID
+			promptCategoryList := "Available category names:\n"
+			for _, cat := range dbCategories {
+				// Assuming db.Category has Name (string) and ID (uuid.UUID)
+				categoryNames = append(categoryNames, cat.Name)
+				catId, err := uuid.Parse(cat.ID.String())
+				if err != nil {
+					respondWithError(w, http.StatusInternalServerError, "Failed to parse category id")
+				}
+
+				categoryMapByName[strings.ToLower(cat.Name)] = catId
+				promptCategoryList += fmt.Sprintf("- %s\n", cat.Name)
+			}
+
+			// Construct a clear prompt for the AI
+			// The system prompt is already part of s.aiModel.systemPrompt
+			aiUserPrompt := fmt.Sprintf(
+				"Analyze the following post description:\n\"%s\"\n\n%s\nBased on the description and the list of available category names, please identify the single most appropriate category. Respond with ONLY the name of the chosen category from the list. For example, if the best category is '%s', your response should be exactly '%s'.",
+				req.Description,
+				promptCategoryList,
+				categoryNames[0], // Use an actual category name as an example
+				categoryNames[0],
+			)
+
+			slog.Info(
+				"Sending prompt to AI for categorization",
+				"user_id",
+				authUserID,
+				"prompt_length",
+				len(aiUserPrompt),
+			)
+			aiGeneratedCategoryName, aiErr := s.aiModel.GenerateResponse(
+				aiUserPrompt,
+			)
+			if aiErr != nil {
+				slog.Error(
+					"AI categorization request failed",
+					"error",
+					aiErr,
+					"user_id",
+					authUserID,
+				)
+			} else {
+				trimmedName := strings.TrimSpace(aiGeneratedCategoryName)
+				slog.Info(
+					"AI returned category name",
+					"name",
+					trimmedName,
+					"user_id",
+					authUserID,
+				)
+
+				// Find the ID for the AI-returned name (case-insensitive)
+				catID, found := categoryMapByName[strings.ToLower(trimmedName)]
+				if found {
+					chosenCategoryID = pgtype.UUID{Bytes: catID, Valid: true}
+					slog.Info(
+						"Successfully matched AI category name to ID",
+						"name",
+						trimmedName,
+						"id",
+						catID.String(),
+						"user_id",
+						authUserID,
+					)
+				} else {
+					slog.Warn(
+						"AI returned category name not found in DB list or was ambiguous",
+						"ai_name",
+						trimmedName,
+						"user_id",
+						authUserID,
+					)
+				}
+			}
+		}
+	} else {
+		if s.aiModel == nil {
+			slog.Warn(
+				"AI model not configured, skipping categorization.",
+				"user_id",
+				authUserID,
+			)
+		}
+		if req.Description == "" {
+			slog.Warn(
+				"Post description is empty, skipping AI categorization.",
+				"user_id",
+				authUserID,
+			)
+		}
+	}
+	// --- End AI Categorization ---
+
 	uploadedImageURLs := []string{}
-	formFiles := r.MultipartForm.File["postImages"] // "postImages" is the field name for files
+	formFiles := r.MultipartForm.File["postImages"]
 
 	if len(formFiles) > maxPostImages {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Too many images. Maximum %d images allowed.", maxPostImages))
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			fmt.Sprintf("Too many images. Maximum %d images allowed.", maxPostImages),
+		)
 		return
 	}
 
 	for _, handler := range formFiles {
 		file, err := handler.Open()
 		if err != nil {
-			slog.Error("Failed to open an uploaded post image file", "filename", handler.Filename, "error", err)
-			respondWithError(w, http.StatusInternalServerError, "Error processing uploaded file: "+handler.Filename)
+			slog.Error(
+				"Failed to open an uploaded post image file",
+				"filename",
+				handler.Filename,
+				"error",
+				err,
+			)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Error processing uploaded file: "+handler.Filename,
+			)
 			return
 		}
-		// defer file.Close() // Deferred inside the loop is tricky; close explicitly or after reading.
 
 		if handler.Size > maxPostImageFileSize {
 			file.Close()
-			respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Post image '%s' too large. Maximum size is %dMB.", handler.Filename, maxPostImageFileSize/(1024*1024)))
+			respondWithError(
+				w,
+				http.StatusBadRequest,
+				fmt.Sprintf(
+					"Post image '%s' too large. Maximum size is %dMB.",
+					handler.Filename,
+					maxPostImageFileSize/(1024*1024),
+				),
+			)
 			return
 		}
 
-		buffer := make([]byte, 512) // For MIME type detection
+		buffer := make([]byte, 512)
 		_, readErr := file.Read(buffer)
 		if readErr != nil && readErr != io.EOF {
 			file.Close()
-			slog.Error("Failed to read post image for MIME type detection", "filename", handler.Filename, "error", readErr)
-			respondWithError(w, http.StatusInternalServerError, "Could not read image for type detection: "+handler.Filename)
+			slog.Error(
+				"Failed to read post image for MIME type detection",
+				"filename",
+				handler.Filename,
+				"error",
+				readErr,
+			)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Could not read image for type detection: "+handler.Filename,
+			)
 			return
 		}
-		_, seekErr := file.Seek(0, io.SeekStart) // Reset reader for full read
+		_, seekErr := file.Seek(0, io.SeekStart)
 		if seekErr != nil {
 			file.Close()
-			slog.Error("Failed to seek post image after MIME type detection", "filename", handler.Filename, "error", seekErr)
-			respondWithError(w, http.StatusInternalServerError, "Could not process image: "+handler.Filename)
+			slog.Error(
+				"Failed to seek post image after MIME type detection",
+				"filename",
+				handler.Filename,
+				"error",
+				seekErr,
+			)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Could not process image: "+handler.Filename,
+			)
 			return
 		}
 
 		contentType := http.DetectContentType(buffer)
 		if !allowedMimeTypes[contentType] {
 			file.Close()
-			slog.Warn("Invalid post image type uploaded", "contentType", contentType, "filename", handler.Filename)
-			respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid image type for '%s': %s. Allowed types: jpeg, png, gif, webp.", handler.Filename, contentType))
+			slog.Warn(
+				"Invalid post image type uploaded",
+				"contentType",
+				contentType,
+				"filename",
+				handler.Filename,
+			)
+			respondWithError(
+				w,
+				http.StatusBadRequest,
+				fmt.Sprintf(
+					"Invalid image type for '%s': %s. Allowed types: jpeg, png, gif, webp.",
+					handler.Filename,
+					contentType,
+				),
+			)
 			return
 		}
 
 		fileBytes, readAllErr := io.ReadAll(file)
-		file.Close() // Close file after reading all bytes
+		file.Close()
 		if readAllErr != nil {
-			slog.Error("Failed to read post image into buffer", "filename", handler.Filename, "error", readAllErr)
-			respondWithError(w, http.StatusInternalServerError, "Could not read image content: "+handler.Filename)
+			slog.Error(
+				"Failed to read post image into buffer",
+				"filename",
+				handler.Filename,
+				"error",
+				readAllErr,
+			)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Could not read image content: "+handler.Filename,
+			)
 			return
 		}
 
-		// Use authUserID or a new UUID for pathing if postID isn't available/desired for filestore pathing at this stage
-		tempEntityIDForPath := uuid.New() // Or authUserID.UUID
-		// Assuming s.filestore.UploadPostImage is similar to UploadProfileImage
-		// It might take a general entity ID for path construction if the specific post ID isn't used yet.
-		uploadedURL, _, uploadErr := s.filestore.UploadProfileImage(r.Context(), fileBytes, handler.Filename, contentType, tempEntityIDForPath)
+		tempEntityIDForPath := uuid.New()
+		uploadedURL, _, uploadErr := s.filestore.UploadProfileImage(
+			r.Context(),
+			fileBytes,
+			handler.Filename,
+			contentType,
+			tempEntityIDForPath,
+		) // Assuming UploadProfileImage can be used or adapt to UploadPostImage
 		if uploadErr != nil {
-			slog.Error("Failed to upload post image via filestore", "filename", handler.Filename, "error", uploadErr)
-			respondWithError(w, http.StatusInternalServerError, "Could not upload image '"+handler.Filename+"': "+uploadErr.Error())
-			return // Fail fast if any image upload fails
+			slog.Error(
+				"Failed to upload post image via filestore",
+				"filename",
+				handler.Filename,
+				"error",
+				uploadErr,
+			)
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Could not upload image '"+handler.Filename+"': "+uploadErr.Error(),
+			)
+			return
 		}
 		uploadedImageURLs = append(uploadedImageURLs, uploadedURL)
-		slog.Info("Successfully uploaded post image", "filename", handler.Filename, "url", uploadedURL)
+		slog.Info(
+			"Successfully uploaded post image",
+			"filename",
+			handler.Filename,
+			"url",
+			uploadedURL,
+		)
 	}
 
-	// 3. Create Post in database
 	params := db.CreatePostParams{
 		Title:             req.Title,
 		Description:       req.Description,
-		Status:            db.PostStatus(req.Status),
-		Priority:          db.PostPriority(req.Priority),
-		PostType:          db.PostType(req.PostType),
+		PostType:          db.PostType(req.PostType), // Ensure db.PostType is the correct type
 		UserID:            authUserID,
 		MaxVolunteers:     req.MaxVolunteers,
-		CurrentVolunteers: 0, // Default
+		CurrentVolunteers: 0,
 		LocationLat:       toPgtypeFloat8(req.LocationLat),
 		LocationLng:       toPgtypeFloat8(req.LocationLng),
 		AddressText:       toPgtypeText(req.AddressText),
+		CategoryID:        chosenCategoryID, // Set the AI-determined category ID
 	}
 
-	// Set default status and priority if not provided
 	if req.Status == "" {
-		params.Status = db.PostStatus("Хүлээгдэж байгаа") // Or your default status
-	}
-	if req.Priority == "" {
-		params.Priority = db.PostPriority("бага") // Or your default priority
+		params.Status = db.PostStatus("Хүлээгдэж байгаа") // Default status
+	} else {
+		params.Status = db.PostStatus(req.Status) // Ensure db.PostStatus is correct type
 	}
 
-	// Set PreviewURL: use from request, or first uploaded image if PreviewURL is empty
+	if req.Priority == "" {
+		params.Priority = db.PostPriority("бага") // Default priority
+	} else {
+		params.Priority = db.PostPriority(req.Priority) // Ensure db.PostPriority is correct
+	}
+
 	if req.PreviewURL != "" {
 		params.PreviewUrl = toPgtypeText(req.PreviewURL)
 	} else if len(uploadedImageURLs) > 0 {
 		params.PreviewUrl = toPgtypeText(uploadedImageURLs[0])
 	}
 
-
 	createdPost, err := s.db.CreatePost(r.Context(), params)
 	if err != nil {
-		// If post creation fails, uploaded images are orphaned in the filestore.
-		// This is a limitation without more complex transaction/cleanup logic.
-		slog.Error("Failed to create post in DB", "error", err, "userID", authUserID.Bytes)
+		slog.Error(
+			"Failed to create post in DB",
+			"error",
+			err,
+			"userID",
+			authUserID.String(),
+		)
 		respondWithError(w, http.StatusInternalServerError, "Failed to create post: "+err.Error())
 		return
 	}
 
-	// 4. Link uploaded images to the created post
-	finalLinkedImageURLs := []string{}
+	finalLinkedImageURLs := []string{} // This will be part of the response DTO
 	for _, imgURL := range uploadedImageURLs {
 		_, dbErr := s.db.CreatePostImage(r.Context(), db.CreatePostImageParams{
-			PostID:   createdPost.ID, // Use the ID from the just-created post
+			PostID:   createdPost.ID,
 			ImageUrl: imgURL,
 		})
 		if dbErr != nil {
-			// If linking fails, the post is created, image is uploaded, but not linked.
-			// This is an inconsistency. For robustness, the entire operation should ideally fail.
-			slog.Error("Failed to create post_image record in DB", "postID", createdPost.ID, "imageURL", imgURL, "error", dbErr)
-			// To make the whole operation fail, you could delete the createdPost here,
-			// and attempt to delete already uploaded files from filestore, then return 500.
-			// For simplicity now, we'll log and this image won't be in the response's list.
-			// OR, better, return 500 to indicate overall failure.
-			respondWithError(w, http.StatusInternalServerError, "Failed to link image '"+imgURL+"' to post: "+dbErr.Error())
-			return // Fail the entire request
+			slog.Error(
+				"Failed to create post_image record in DB",
+				"postID",
+				createdPost.ID,
+				"imageURL",
+				imgURL,
+				"error",
+				dbErr,
+			)
+			// For simplicity, we log and continue; the image won't be linked.
+			// For stricter handling, you might want to roll back or delete the post.
+			// Or return an error for the whole request.
+			respondWithError(
+				w,
+				http.StatusInternalServerError,
+				"Failed to link image '"+imgURL+"' to post: "+dbErr.Error(),
+			)
+			return
 		}
 		finalLinkedImageURLs = append(finalLinkedImageURLs, imgURL)
 	}
 
-	responseDTO := toPostResponseDTO(createdPost)
+	responseDTO := toPostResponseDTO(createdPost) // Ensure this DTO can include image URLs
+	// You might want to add finalLinkedImageURLs to responseDTO if it's designed for it
+	// e.g., responseDTO.ImageURLs = finalLinkedImageURLs
+
 	respondWithJSON(w, http.StatusCreated, responseDTO)
 }
 

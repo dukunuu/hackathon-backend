@@ -57,8 +57,8 @@ func LoadConfig() (*Config, error) {
 
 
 	// Load Ollama configuration
-	ollamaAddr := common.GetString("OLLAMA_ADDR", "http://localhost:11434") // Default Ollama address
-	ollamaModelName := common.GetString("OLLAMA_MODEL_NAME", "llama3")      // Default model name
+	ollamaAddr := common.GetString("OLLAMA_ADDR", "http://ollama:11434") // Default Ollama address
+	ollamaModelName := common.GetString("OLLAMA_MODEL_NAME", "gemma3:1b")      // Default model name
 	ollamaSystemPrompt := common.GetString("OLLAMA_SYSTEM_PROMPT", "")    // Default system prompt
 
 	if ollamaModelName == "" {

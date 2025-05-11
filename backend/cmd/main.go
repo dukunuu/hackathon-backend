@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 
+	"github.com/dukunuu/hackathon_backend/ai"
 	"github.com/dukunuu/hackathon_backend/config"
 	"github.com/dukunuu/hackathon_backend/db"
+	_ "github.com/dukunuu/hackathon_backend/docs"
 	"github.com/dukunuu/hackathon_backend/file"
 	"github.com/dukunuu/hackathon_backend/server"
-	_ "github.com/dukunuu/hackathon_backend/docs"
 )
 
 // @title Hackathon Backend API
@@ -56,7 +58,24 @@ func main() {
 		log.Fatal("Failed to load file store: ", err)
 	}
 
-	srvr := server.Init(cfg.HOST, cfg.JWT_SECRET, db, store)
+	aiModel, err := ai.Init(cfg)
+	if err!=nil {
+		log.Fatal("Failed to load file store: ", err)
+	}
+
+	if aiModel != nil {
+    slog.Info("Sending warm-up request to Ollama model", "model", cfg.OLLAMA_MODEL_NAME)
+    // Use a very simple prompt that the model should easily handle
+    warmUpPrompt := "Hello! Are you ready?"
+    _, err := aiModel.GenerateResponse(warmUpPrompt)
+    if err != nil {
+        slog.Warn("Ollama warm-up request failed (this might be okay if it's still loading)", "error", err)
+    } else {
+        slog.Info("Ollama warm-up request successful.")
+    }
+}
+
+	srvr := server.Init(cfg.HOST, cfg.JWT_SECRET, db, store, aiModel)
 
 	log.Printf("Starting server on port: %s", cfg.HOST)
 	srvr.Start()

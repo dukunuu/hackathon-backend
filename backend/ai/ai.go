@@ -1,4 +1,3 @@
-// package ai
 package ai
 
 import (
@@ -55,7 +54,7 @@ func NewOllamaModel(addr string, modelName string, systemPrompt string) (*Ollama
 	}
 
 	httpClient := &http.Client{
-		Timeout: 30 * time.Second, // Set a reasonable timeout
+		Timeout: 60 * time.Second, // Set a reasonable timeout
 	}
 
 	healthCheckURL := addr
